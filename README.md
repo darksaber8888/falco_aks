@@ -30,8 +30,7 @@
     --set falco.log_level=info \
     --set collectors.kubernetes.enabled=true
 
-7. Installing Event-generator
-   helm install event-generator falcosecurity/event-generator --namespace "falco"
+7. Verify Installation
    kubectl get all -n falco
    kubectl get pods -n falco
    kubectl get svc -n falco
