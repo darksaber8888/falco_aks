@@ -1,11 +1,12 @@
 1. Installing Helm package manager:
-   curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
-   sudo apt-get install apt-transport-https --yes
-   echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
-   sudo apt-get update
-   sudo apt-get install helm
+   
+   * curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
+   * sudo apt-get install apt-transport-https --yes
+   * echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/helm.gpg] https://baltocdn.com/helm/stable/debian/ all main" | sudo tee /etc/apt/sources.list.d/helm-stable-debian.list
+   * sudo apt-get update
+   * sudo apt-get install helm
 
-2. Adding Falco helm charts to helm repos:
+3. Adding Falco helm charts to helm repos:
 
    helm repo add falcosecurity https://falcosecurity.github.io/charts
    helm repo update
@@ -31,7 +32,8 @@
     --set collectors.kubernetes.enabled=true
 
 7. Verify Installation
-   kubectl get all -n falco
-   kubectl get pods -n falco
-   kubectl get svc -n falco
+   
+   * kubectl get all -n falco
+   * kubectl get pods -n falco
+   * kubectl get svc -n falco
    Note: Open ports 2801 and 2802 on the jumpserver and change the username and password for accessing falcosidekick-ui
