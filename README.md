@@ -1,4 +1,4 @@
-1. Installing Helm package manager:
+**1. Installing Helm package manager:**
    
    * curl https://baltocdn.com/helm/signing.asc | gpg --dearmor | sudo tee /usr/share/keyrings/helm.gpg > /dev/null
    * sudo apt-get install apt-transport-https --yes
@@ -6,16 +6,16 @@
    * sudo apt-get update
    * sudo apt-get install helm
 
-3. Adding Falco helm charts to helm repos:
+**3. Adding Falco helm charts to helm repos:**
 
    helm repo add falcosecurity https://falcosecurity.github.io/charts
    helm repo update
 
-4. Creating custom_rules.yaml file:
+**4. Creating custom_rules.yaml file:**
 
    Refer to the file.
 
-6. Installing Falco on AKs using default Charts.yaml and Values.yaml file:
+**6. Installing Falco on AKs using default Charts.yaml and Values.yaml file:**
                                                                                                                                                                                                                  
    helm install falco -f custom_rules.yaml falcosecurity/falco \
     --version 4.0.0 \
@@ -31,7 +31,7 @@
     --set falco.log_level=info \
     --set collectors.kubernetes.enabled=true
 
-7. Verify Installation
+**7. Verify Installation**
    
    * kubectl get all -n falco
    * kubectl get pods -n falco
