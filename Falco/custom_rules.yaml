@@ -1,0 +1,122 @@
+# custom_rules.yaml
+
+# Macro definitions to simplify rule writing
+macros:
+  - macro: trusted_binaries
+    condition: >
+      (proc.name in (user_known_execs) and proc.pcmdline in (user_known_cmdlines))
+  - macro: sensitive_files
+    condition: >
+      (fd.name="/etc/passwd" or fd.name="/etc/shadow" or fd.name startswith "/etc/")
+  - macro: consider_all_chmods
+    condition: >
+      (evt.type in (chmod, fchmod, fchmodat))
+  - macro: disable_apparmor
+    condition: (proc.name in (systemctl, service) and (proc.cmdline contains "disable" or proc.cmdline contains "stop") and (proc.cmdline contains "apparmor"))
+  - macro: disable_selinux
+    condition: (proc.cmdline = "setenforce 0")
+  - macro: disable_ufw
+    condition: (proc.name=ufw and proc.cmdline contains "disable")
+  - macro: hidden_file
+    condition: >
+      (evt.type in (open, openat, creat, mkdir, mkdirat) and fd.name contains "/." and not fd.name contains "/../")
+
+# List of known safe executables and command lines
+lists:
+  - list: user_known_execs
+    items: ["bash", "sh", "zsh", "curl", "wget"]
+  - list: user_known_cmdlines
+    items: ["sudo su", "/bin/bash", "/usr/bin/curl"]
+  - list: user_known_chmod_applications
+    items: ["trusted_chmod_app"]
+  - list: user_known_network_apps
+    items: ["curl", "wget", "ssh"]
+
+# Custom rules
+rules:
+  - rule: Write sensitive file
+    desc: Detect any write operation to sensitive files like /etc/passwd or /etc/shadow
+    condition: >
+      (evt.type in (open, openat, creat) and evt.arg.flags contains O_CREAT) and not trusted_binaries and sensitive_files
+    output: >
+      "Sensitive file write detected (user=%user.name user=%user.uid process=%proc.name parent=%proc.pname file=%fd.name command=%proc.cmdline)"
+    priority: CRITICAL
+    tags: [filesystem, sensitive, security]
+
+  - rule: Unexpected shell in container
+    desc: Detect if an unexpected shell is spawned inside a container
+    condition: >
+      container.id != host and proc.name in (bash, sh, zsh) and not trusted_binaries
+    output: >
+      "Unexpected shell spawned in container (user=%user.name user=%user.uid process=%proc.name parent=%proc.pname command=%proc.cmdline container_id=%container.id)"
+    priority: HIGH
+    tags: [container, shell, security]
+
+  - rule: Unexpected program execution
+    desc: Detect if an unexpected program is executed
+    condition: >
+      proc.name in (netcat, nc, ncat, nmap) and not trusted_binaries
+    output: >
+      "Unexpected program execution detected (user=%user.name user=%user.uid process=%proc.name parent=%proc.pname command=%proc.cmdline)"
+    priority: HIGH
+    tags: [execution, security, network]
+
+  - rule: Set Setuid or Setgid bit
+    desc: >
+      When the setuid or setgid bits are set for an application,
+      this means that the application will run with the privileges of the owning user or group respectively.
+      Detect setuid or setgid bits set via chmod
+    condition: >
+      consider_all_chmods and chmod and (evt.arg.mode contains "S_ISUID" or evt.arg.mode contains "S_ISGID")
+      and not proc.name in (user_known_chmod_applications)
+      and not exe_running_docker_save
+      and not user_known_set_setuid_or_setgid_bit_conditions
+    output: >
+      "Setuid or setgid bit is set via chmod (fd=%evt.arg.fd filename=%evt.arg.filename mode=%evt.arg.mode user=%user.name user_loginuid=%user.loginuid process=%proc.name
+      command=%proc.cmdline container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)"
+    priority: NOTICE
+    tags: [process, mitre_persistence]
+
+  - rule: Disable Security Tools
+    desc: Detect an attempt to disable security tools like ufw, AppArmor, SELinux
+    condition: spawned_process and (disable_apparmor or disable_selinux or disable_ufw)
+    output: >
+      "Security tool is disabled (user=%user.name user_loginuid=%user.loginuid command=%proc.cmdline parent_process=%proc.pname container_id=%container.id image=%container.image.repository:%container.image.tag)"
+    priority: WARNING
+    tags: [process, security]
+
+  - rule: Hidden File or Directory Created
+    desc: Detect creation of hidden files or directories
+    condition: >
+      hidden_file and not trusted_binaries
+    output: >
+      "Hidden file or directory created (user=%user.name user_loginuid=%user.loginuid file=%fd.name process=%proc.name parent_process=%proc.pname command=%proc.cmdline container_id=%container.id image=%container.image.repository:%container.image.tag)"
+    priority: NOTICE
+    tags: [filesystem, security, hidden_files]
+
+  - rule: Unexpected Outbound Network Connection
+    desc: Detect unexpected outbound network connections
+    condition: >
+      outbound and (proc.name not in (user_known_network_apps))
+    output: >
+      "Unexpected outbound network connection detected (user=%user.name user_loginuid=%user.loginuid process=%proc.name parent_process=%proc.pname destination=%fd.name command=%proc.cmdline container_id=%container.id image=%container.image.repository:%container.image.tag)"
+    priority: HIGH
+    tags: [network, security]
+
+  - rule: Shell into Container
+    desc: Detect shell access into a container
+    condition: >
+      container.id != host and proc.name in (sh, bash, zsh, ash, ksh, csh, tcsh, dash, fish)
+    output: >
+      "Shell access into container detected (user=%user.name user_loginuid=%user.loginuid process=%proc.name parent_process=%proc.pname command=%proc.cmdline container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)"
+    priority: HIGH
+    tags: [container, shell, security]
+
+  - rule: Launching Privileged Container
+    desc: Detect launching of privileged containers
+    condition: >
+      container and container.privileged=true
+    output: >
+      "Privileged container launched (user=%user.name user_loginuid=%user.loginuid process=%proc.name parent_process=%proc.pname command=%proc.cmdline container_id=%container.id container_name=%container.name image=%container.image.repository:%container.image.tag)"
+    priority: CRITICAL
+    tags: [container, security]
